@@ -1,0 +1,51 @@
+
+FROM python:3.11-slim
+
+WORKDIR /app
+
+
+RUN apt-get update && apt-get install -y \
+    libgl1-mesa-glx \
+    libglib2.0-0 \
+    poppler-utils \
+    tesseract-ocr \
+    libgomp1 \
+    build-essential \
+    wget \
+    curl \
+    bash \
+    file \
+    && rm -rf /var/lib/apt/lists/*
+
+
+RUN curl -L https://registrationcenter-download.intel.com/akdlm/IRC_NAS/dc93af13-2b3f-40c3-a41b-2bc05a707a80/intel-onemkl-2025.1.0.803_offline.sh -o mkl_install.sh \
+    && file mkl_install.sh | grep "POSIX shell script" || (echo "Downloaded file is not a shell script"; exit 1) \
+    && [ $(stat -c %s mkl_install.sh) -gt 100000000 ] || (echo "Downloaded file is too small"; exit 1) \
+    && chmod +x mkl_install.sh \
+    && bash ./mkl_install.sh -a --silent --eula accept --install-dir /opt/intel/mkl \
+    && rm -rf mkl_install.sh intel-onemkl-* \
+    && ln -s /opt/intel/mkl/lib/intel64 /usr/lib/mkl \
+    && echo "/usr/lib/mkl" > /etc/ld.so.conf.d/mkl.conf \
+    && ldconfig
+
+
+RUN pip install --upgrade pip
+
+
+COPY ./docker/requirements.txt /app/requirements.txt
+RUN pip install --no-cache-dir -r /app/requirements.txt --resume-retries 5
+
+RUN apt-get update && apt-get install -y swig
+
+
+
+COPY ./backend /app
+
+
+RUN ls -R /app
+
+
+
+ENV PYTHONPATH=/app
+
+CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
