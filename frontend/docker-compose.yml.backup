@@ -1,0 +1,59 @@
+version: '3.8'
+services:
+  backend:
+    build:
+      context: ../
+      dockerfile: docker/Dockerfile.backend
+    ports:
+      - "8000:8000"
+    networks:
+      - app-network
+  frontend:
+    build:
+      context: ../
+      dockerfile: frontend/Dockerfile  # Updated to use the correct Dockerfile
+    volumes:
+      - ../:/app
+    ports:
+      - "3001:3000"  # Map host port 3001 to container port 3000
+    networks:
+      - app-network
+  elasticsearch:
+    image: elasticsearch:7.14.0
+    ports:
+      - "19200:9200"
+    environment:
+      - discovery.type=single-node
+    networks:
+      - app-network
+  redis:
+    image: redis:6.2
+    ports:
+      - "16379:6379"
+    networks:
+      - app-network
+  minio:
+    image: minio/minio
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    environment:
+      - MINIO_ROOT_USER=minioadmin
+      - MINIO_ROOT_PASSWORD=minioadmin
+    command: server /data --console-address ":9001"
+    networks:
+      - app-network
+  nginx:
+    image: nginx:latest
+    ports:
+      - "3000:80"
+    volumes:
+      - ../nginx:/etc/nginx/conf.d
+    depends_on:
+      - backend
+      - frontend
+    networks:
+      - app-network
+networks:
+  app-network:
+    driver: bridge
